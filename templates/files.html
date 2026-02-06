@@ -3,147 +3,126 @@
 {% block title %}File Manager{% endblock %}
 
 {% block content %}
-<!-- Breadcrumb Navigation -->
-{% if breadcrumb and breadcrumb|length > 1 %}
-<nav aria-label="breadcrumb" class="mb-4 animate__animated animate__fadeInDown">
-    <ol class="breadcrumb bg-dark-blue border border-primary rounded px-3 py-2">
-        {% for item in breadcrumb %}
-            {% if item.path %}
-                <li class="breadcrumb-item">
-                    <a href="{{ url_for('file_list', folder_path=item.path) }}" class="text-primary text-decoration-none">
-                        <i class="fas fa-folder me-1"></i>{{ item.name }}
+<!-- Breadcrumb Navigation (Windows Explorer Style) -->
+<div class="mb-4 animate__animated animate__fadeInDown">
+    <div class="breadcrumb-explorer bg-dark-blue border border-secondary rounded px-3 py-2">
+        <nav aria-label="breadcrumb" class="d-flex align-items-center">
+            <a href="{{ url_for('file_list') }}" class="breadcrumb-link me-2" title="Storage">
+                <i class="fas fa-home"></i>
+            </a>
+            <span class="breadcrumb-separator me-2">&gt;</span>
+            {% for item in breadcrumb %}
+                {% if item.path %}
+                    <a href="{{ url_for('file_list', folder_path=item.path) }}" class="breadcrumb-link">
+                        {{ item.name }}
                     </a>
-                </li>
+                    <span class="breadcrumb-separator mx-2">&gt;</span>
+                {% endif %}
+            {% endfor %}
+            {% if current_path %}
+                <span class="breadcrumb-current">{{ breadcrumb[-1].name if breadcrumb else 'Storage' }}</span>
             {% else %}
-                <li class="breadcrumb-item active" aria-current="page">
-                    <i class="fas fa-home me-1"></i>{{ item.name }}
-                </li>
+                <span class="breadcrumb-current">Storage</span>
             {% endif %}
-        {% endfor %}
-    </ol>
-</nav>
-{% endif %}
+        </nav>
+    </div>
+</div>
 
-<div class="row mb-4">
-    <div class="col">
-        <h2 class="animate__animated animate__fadeInLeft">
-            <i class="fas fa-folder me-3 text-primary"></i>Storage Directory
-        </h2>
-        <p class="text-muted animate__animated animate__fadeInRight">
+<!-- Toolbar -->
+<div class="toolbar-explorer mb-3 px-3 py-2 bg-dark-blue border border-secondary rounded d-flex justify-content-between align-items-center">
+    <div class="toolbar-left">
+        <a class="nav-button" href="{{ url_for('file_list') }}" title="Back"><i class="fas fa-arrow-left"></i></a>
+        <span class="separator-vertical"></span>
+        <span class="status-info text-muted ms-3">
             <i class="fas fa-info-circle me-1"></i>
-            Total files: {{ files|length }} • Total folders: {{ folders|length }}
-        </p>
+            <strong>{{ folders|length }}</strong> folder{{ 's' if folders|length != 1 else '' }} • 
+            <strong>{{ files|length }}</strong> file{{ 's' if files|length != 1 else '' }}
+        </span>
     </div>
 </div>
 
-<!-- Upload Section -->
-<div class="card bg-dark-blue border-primary mb-4 animate__animated animate__fadeInUp">
-    <div class="card-header bg-transparent border-primary">
-        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Files</h5>
-    </div>
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" class="dropzone" id="uploadDropzone">
+<!-- Upload & Create Folder Section -->
+<div class="mb-3 d-flex gap-2">
+    <form method="POST" action="{{ url_for('create_folder') }}" class="flex-grow-1 d-flex gap-2">
+        <input type="hidden" name="current_path" value="{{ current_path }}">
+        <input type="text" 
+               class="form-control bg-dark border border-secondary" 
+               name="folder_name" 
+               placeholder="New folder name"
+               style="flex: 1;">
+        <button type="submit" class="btn btn-outline-primary">
+            <i class="fas fa-folder-plus me-1"></i>New Folder
+        </button>
+    </form>
+    <label class="btn btn-outline-success">
+        <i class="fas fa-arrow-up me-1"></i>Upload
+        <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
             <input type="hidden" name="current_path" value="{{ current_path }}">
-            <div class="dz-message needsclick">
-                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
-                <h4>Drop files here or click to upload</h4>
-                <span class="text-muted">Max file size: 100MB</span>
-            </div>
+            <input type="file" form="uploadForm" id="fileUpload" multiple name="file" style="display: none;">
         </form>
-    </div>
+    </label>
 </div>
 
-<!-- Create Folder Section -->
-<div class="card bg-dark-blue border-primary mb-4 animate__animated animate__fadeInUp">
-    <div class="card-body">
-        <form method="POST" action="{{ url_for('create_folder') }}" class="row g-3">
-            <input type="hidden" name="current_path" value="{{ current_path }}">
-            <div class="col-md-8">
-                <input type="text" 
-                       class="form-control bg-dark border-primary" 
-                       name="folder_name" 
-                       placeholder="New folder name" 
-                       required>
-            </div>
-            <div class="col-md-4">
-                <button type="submit" class="btn btn-primary w-100">
-                    <i class="fas fa-folder-plus me-2"></i>Create Folder
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Files List -->
-<div class="card bg-dark-blue border-primary animate__animated animate__fadeIn">
-    <div class="card-header bg-transparent border-primary d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="fas fa-file me-2"></i>Files & Folders</h5>
-        <span class="badge bg-primary">{{ files|length + folders|length }} items</span>
-    </div>
-    <div class="card-body p-0">
+<!-- Main File Explorer View -->
+<div class="explorer-container bg-dark-blue border border-secondary rounded" style="min-height: 500px;">
+    <div class="file-grid p-3" id="fileGrid">
         {% if files or folders %}
-        <div class="table-responsive">
-            <table class="table table-dark table-hover mb-0" role="presentation">
-                <thead class="bg-dark">
-                    <tr>
-                        <th><i class="fas fa-file me-2"></i>Name</th>
-                        <th><i class="fas fa-ruler-vertical me-2"></i>Size</th>
-                        <th><i class="fas fa-calendar me-2"></i>Modified</th>
-                        <th><i class="fas fa-cogs me-2"></i>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Folders -->
-                    {% for folder in folders %}
-                    <tr class="animate__animated animate__fadeIn folder-row" data-folder="{{ folder.path }}">
-                        <td>
-                            <i class="fas fa-folder text-warning me-2"></i>
-                            <strong>{{ folder.name }}</strong>
-                        </td>
-                        <td class="text-muted">—</td>
-                        <td class="text-muted">—</td>
-                        <td class="action-buttons">
-                            <a href="{{ url_for('file_list', folder_path=folder.path) }}" 
-                               class="btn btn-sm btn-outline-info me-2" 
-                               title="Open folder">
-                                <i class="fas fa-folder-open"></i>
-                            </a>
-                            <a href="{{ url_for('download_folder', folder_path=folder.path) }}" 
-                               class="btn btn-sm btn-outline-success me-2"
-                               title="Download as ZIP">
-                                <i class="fas fa-download"></i>
-                            </a>
-                            <a href="{{ url_for('delete_file', file_path=folder.path) }}" 
-                               class="btn btn-sm btn-outline-danger"
-                               title="Delete folder"
-                               onclick="return confirm('Delete this folder and all contents?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    
-                    <!-- Files -->
-                    {% for file in files %}
-                    <tr class="animate__animated animate__fadeIn file-row" data-file="{{ file.path }}">
-                        <td>
-                            {% set ext = file.name.split('.')[-1].lower() %}
-                            {% if ext in ['jpg', 'jpeg', 'png', 'gif'] %}
-                                <i class="fas fa-image text-info me-2"></i>
-                            {% elif ext in ['pdf'] %}
-                                <i class="fas fa-file-pdf text-danger me-2"></i>
-                            {% elif ext in ['doc', 'docx'] %}
-                                <i class="fas fa-file-word text-primary me-2"></i>
-                            {% elif ext in ['xls', 'xlsx'] %}
-                                <i class="fas fa-file-excel text-success me-2"></i>
-                            {% elif ext in ['zip', 'rar'] %}
-                                <i class="fas fa-file-archive text-warning me-2"></i>
-                            {% else %}
-                                <i class="fas fa-file text-secondary me-2"></i>
-                            {% endif %}
-                            {{ file.name }}
-                        </td>
-                        <td>
+            {% if not folders and not files %}
+            <div class="empty-state">
+                <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">No files or folders found</h5>
+                <p class="text-muted">Upload files or create folders to get started</p>
+            </div>
+            {% else %}
+                <!-- Folders Section -->
+                {% for folder in folders %}
+                <div class="file-item folder-item" data-folder="{{ folder.path }}" data-name="{{ folder.name }}">
+                    <div class="file-icon-container">
+                        <i class="fas fa-folder fa-3x text-warning"></i>
+                    </div>
+                    <div class="file-name-container">
+                        <span class="file-name" title="{{ folder.name }}">{{ folder.name }}</span>
+                    </div>
+                    <div class="file-actions" style="display: none;">
+                        <a href="{{ url_for('download_folder', folder_path=folder.path) }}" 
+                           class="action-link" title="Download as ZIP">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        <a href="{{ url_for('delete_file', file_path=folder.path) }}" 
+                           class="action-link" title="Delete"
+                           onclick="return confirm('Delete this folder and all contents?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Files Section -->
+                {% for file in files %}
+                {% set ext = file.name.split('.')[-1].lower() %}
+                <div class="file-item file-item-file" data-file="{{ file.path }}" data-name="{{ file.name }}" data-size="{{ file.size }}">
+                    <div class="file-icon-container">
+                        {% if ext in ['jpg', 'jpeg', 'png', 'gif'] %}
+                            <i class="fas fa-image fa-3x text-info"></i>
+                        {% elif ext in ['pdf'] %}
+                            <i class="fas fa-file-pdf fa-3x text-danger"></i>
+                        {% elif ext in ['doc', 'docx'] %}
+                            <i class="fas fa-file-word fa-3x text-primary"></i>
+                        {% elif ext in ['xls', 'xlsx'] %}
+                            <i class="fas fa-file-excel fa-3x text-success"></i>
+                        {% elif ext in ['zip', 'rar', '7z'] %}
+                            <i class="fas fa-file-archive fa-3x text-warning"></i>
+                        {% elif ext in ['mp3', 'wav', 'flac'] %}
+                            <i class="fas fa-file-audio fa-3x text-light"></i>
+                        {% elif ext in ['mp4', 'avi', 'mov', 'mkv'] %}
+                            <i class="fas fa-file-video fa-3x text-secondary"></i>
+                        {% else %}
+                            <i class="fas fa-file fa-3x text-muted"></i>
+                        {% endif %}
+                    </div>
+                    <div class="file-name-container">
+                        <span class="file-name" title="{{ file.name }}">{{ file.name }}</span>
+                        <span class="file-size">
                             {% if file.size < 1024 %}
                                 {{ file.size }} B
                             {% elif file.size < 1048576 %}
@@ -151,30 +130,24 @@
                             {% else %}
                                 {{ (file.size / 1048576)|round(1) }} MB
                             {% endif %}
-                        </td>
-                        <td class="text-muted">
-                            {{ file.modified }}
-                        </td>
-                        <td class="action-buttons">
-                            <a href="{{ url_for('download_file', file_path=file.path) }}" 
-                               class="btn btn-sm btn-outline-success me-2"
-                               title="Download file">
-                                <i class="fas fa-download"></i>
-                            </a>
-                            <a href="{{ url_for('delete_file', file_path=file.path) }}" 
-                               class="btn btn-sm btn-outline-danger"
-                               title="Delete file"
-                               onclick="return confirm('Delete this file?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                        </span>
+                    </div>
+                    <div class="file-actions" style="display: none;">
+                        <a href="{{ url_for('download_file', file_path=file.path) }}" 
+                           class="action-link" title="Download">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        <a href="{{ url_for('delete_file', file_path=file.path) }}" 
+                           class="action-link" title="Delete"
+                           onclick="return confirm('Delete this file?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
         {% else %}
-        <div class="text-center py-5">
+        <div class="empty-state text-center py-5">
             <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
             <h5 class="text-muted">No files or folders found</h5>
             <p class="text-muted">Upload files or create folders to get started</p>
@@ -183,10 +156,19 @@
     </div>
 </div>
 
+<!-- Status Bar -->
+<div class="mt-3 status-bar px-3 py-2 bg-dark-blue border border-secondary rounded d-flex justify-content-between align-items-center">
+    <div class="status-info text-muted small">
+        <span id="itemCount">{{ folders|length + files|length }}</span> item{{ 's' if folders|length + files|length != 1 else '' }} 
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        Storage Used: <strong id="storageUsed">0</strong>
+    </div>
+</div>
+
 <!-- Stats -->
 <div class="row mt-4">
     <div class="col-md-4">
-        <div class="card bg-dark-blue border-primary text-center animate__animated animate__fadeInUp">
+        <div class="card bg-dark-blue border-secondary text-center animate__animated animate__fadeInUp">
             <div class="card-body">
                 <h1 class="display-6 text-primary">{{ files|length }}</h1>
                 <p class="text-muted mb-0">Files</p>
@@ -194,18 +176,18 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card bg-dark-blue border-primary text-center animate__animated animate__fadeInUp">
+        <div class="card bg-dark-blue border-secondary text-center animate__animated animate__fadeInUp">
             <div class="card-body">
-                <h1 class="display-6 text-info">{{ folders|length }}</h1>
+                <h1 class="display-6 text-success">{{ folders|length }}</h1>
                 <p class="text-muted mb-0">Folders</p>
             </div>
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card bg-dark-blue border-primary text-center animate__animated animate__fadeInUp">
+        <div class="card bg-dark-blue border-secondary text-center animate__animated animate__fadeInUp">
             <div class="card-body">
-                <h1 class="display-6 text-success" id="storageUsed">0</h1>
-                <p class="text-muted mb-0">Storage Used</p>
+                <h1 class="display-6 text-info" id="totalStorage">0</h1>
+                <p class="text-muted mb-0">Total Size</p>
             </div>
         </div>
     </div>
@@ -213,88 +195,354 @@
 {% endblock %}
 
 {% block scripts %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
-
 <style>
-/* Fix for action buttons focus/click glitch */
-.action-buttons {
-    pointer-events: auto !important;
-    cursor: auto !important;
+/* Windows File Explorer Style CSS */
+.breadcrumb-explorer {
+    background: linear-gradient(135deg, rgba(25, 51, 102, 0.7) 0%, rgba(0, 123, 255, 0.1) 100%) !important;
 }
 
-.action-buttons .btn {
-    pointer-events: auto !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    z-index: 10;
-}
-
-.action-buttons .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.action-buttons .btn:focus {
-    outline: 2px solid #007bff !important;
-    outline-offset: -2px;
-}
-
-/* Table row improvement */
-tbody tr {
-    transition: background-color 0.2s ease;
-}
-
-tbody tr:hover {
-    background-color: rgba(0, 123, 255, 0.1) !important;
-}
-
-/* Breadcrumb styling */
-.breadcrumb {
-    background: linear-gradient(135deg, rgba(25, 51, 102, 0.5) 0%, rgba(0, 123, 255, 0.1) 100%) !important;
-}
-
-.breadcrumb-item a {
+.breadcrumb-link {
+    color: #0ea5e9 !important;
+    text-decoration: none;
+    padding: 0 8px;
+    border-radius: 4px;
     transition: all 0.2s ease;
 }
 
-.breadcrumb-item a:hover {
+.breadcrumb-link:hover {
+    background-color: rgba(14, 165, 233, 0.1);
     color: #00d4ff !important;
-    text-decoration: underline !important;
+}
+
+.breadcrumb-separator {
+    color: #6b7280;
+}
+
+.breadcrumb-current {
+    color: #e5e7eb;
+    font-weight: 500;
+}
+
+.toolbar-explorer {
+    background: linear-gradient(135deg, rgba(25, 51, 102, 0.7) 0%, rgba(0, 123, 255, 0.05) 100%) !important;
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.nav-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.nav-button:hover {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    border-color: rgba(96, 165, 250, 0.3);
+}
+
+.nav-button:disabled {
+    color: #4b5563;
+    cursor: not-allowed;
+}
+
+.separator-vertical {
+    width: 1px;
+    height: 24px;
+    background-color: #374151;
+    margin: 0 8px;
+}
+
+.status-bar {
+    background: linear-gradient(135deg, rgba(25, 51, 102, 0.5) 0%, rgba(0, 123, 255, 0.05) 100%) !important;
+}
+
+/* File Grid */
+.explorer-container {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.5) 100%) !important;
+}
+
+.file-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    grid-auto-rows: auto;
+}
+
+.file-item {
+    position: relative;
+    padding: 12px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+}
+
+.file-item:hover {
+    background-color: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.file-item.selected {
+    background-color: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.folder-item:hover .file-actions,
+.file-item-file:hover .file-actions {
+    display: flex !important;
+}
+
+.file-icon-container {
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background-color: rgba(15, 23, 42, 0.5);
+    transition: all 0.2s ease;
+}
+
+.file-item:hover .file-icon-container {
+    background-color: rgba(59, 130, 246, 0.2);
+}
+
+.file-name-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.file-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: #e5e7eb;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+
+.file-size {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.file-actions {
+    display: flex;
+    gap: 6px;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(15, 23, 42, 0.95);
+    padding: 4px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.action-link {
+    color: #6b7280;
+    text-decoration: none;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.action-link:hover {
+    color: #f87171;
+    background-color: rgba(244, 63, 94, 0.1);
+}
+
+.action-link[title="Download"] {
+    color: #34d399;
+}
+
+.action-link[title="Download"]:hover {
+    color: #1f3a3a;
+    background-color: rgba(52, 211, 153, 0.2);
+}
+
+.action-link[title="Download as ZIP"] {
+    color: #34d399;
+}
+
+.action-link[title="Download as ZIP"]:hover {
+    color: #1f3a3a;
+    background-color: rgba(52, 211, 153, 0.2);
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+}
+
+/* Upload area */
+#fileUpload {
+    display: none;
+}
+
+.btn-outline-primary,
+.btn-outline-success {
+    border-color: rgba(59, 130, 246, 0.5);
+    color: #60a5fa;
+    transition: all 0.2s ease;
+}
+
+.btn-outline-primary:hover,
+.btn-outline-success:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: #60a5fa;
+    color: #93c5fd;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Dropzone
-    Dropzone.autoDiscover = false;
-    
-    const dropzone = new Dropzone("#uploadDropzone", {
-        url: "{{ url_for('upload_file') }}",
-        paramName: "file",
-        maxFilesize: 100, // MB
-        acceptedFiles: "{% for ext in config.ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}",
-        dictDefaultMessage: "Drop files here to upload",
-        dictFallbackMessage: "Your browser doesn't support file uploads.",
-        dictFileTooBig: "File is too big ({{filesize}}MB). Max filesize: {{maxFilesize}}MB.",
-        dictInvalidFileType: "File type not allowed.",
-        dictCancelUpload: "Cancel upload",
-        dictCancelUploadConfirmation: "Are you sure you want to cancel this upload?",
-        dictRemoveFile: "Remove file",
-        dictMaxFilesExceeded: "You can only upload one file at a time.",
-        init: function() {
-            this.on("success", function(file, response) {
-                setTimeout(() => {
-                    location.reload();
-                }, 1500);
-            });
+    const fileGrid = document.getElementById('fileGrid');
+    const fileUploadInput = document.getElementById('fileUpload');
+    let selectedItems = new Set();
+
+    // File upload handling
+    const uploadButton = document.querySelector('.btn-outline-success');
+    if (uploadButton) {
+        uploadButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            fileUploadInput.click();
+        });
+    }
+
+    // Handle file selection and upload
+    fileUploadInput.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            const formData = new FormData(document.getElementById('uploadForm'));
             
-            this.on("error", function(file, errorMessage) {
-                alert("Upload error: " + errorMessage);
-            });
+            // Add files to form data
+            for (let file of this.files) {
+                // Upload each file individually
+                const form = new FormData();
+                form.append('file', file);
+                form.append('current_path', document.querySelector('input[name="current_path"]').value);
+                
+                fetch('{{ url_for("upload_file") }}', {
+                    method: 'POST',
+                    body: form
+                }).then(() => {
+                    location.reload();
+                }).catch(err => {
+                    console.error('Upload error:', err);
+                    alert('Upload failed: ' + err);
+                });
+            }
+        }
+        this.value = '';
+    });
+
+    // File explorer double-click and selection
+    const fileItems = document.querySelectorAll('.file-item');
+    
+    fileItems.forEach(item => {
+        let clickCount = 0;
+        let clickTimer = null;
+
+        item.addEventListener('click', function(e) {
+            e.stopPropagation();
+            
+            // Handle action buttons
+            if (e.target.closest('.file-actions') || e.target.closest('.action-link')) {
+                return;
+            }
+
+            clickCount++;
+            
+            if (clickCount === 1) {
+                // Single click - select item
+                if (!e.ctrlKey && !e.shiftKey) {
+                    selectedItems.forEach(el => el.classList.remove('selected'));
+                    selectedItems.clear();
+                }
+                
+                this.classList.add('selected');
+                selectedItems.add(this);
+                
+                clickTimer = setTimeout(() => {
+                    clickCount = 0;
+                }, 300);
+            } else if (clickCount === 2) {
+                // Double click
+                clearTimeout(clickTimer);
+                clickCount = 0;
+                
+                // If it's a folder, navigate to it
+                if (this.classList.contains('folder-item')) {
+                    const folderPath = this.getAttribute('data-folder');
+                    window.location.href = '{{ url_for("file_list", folder_path="") }}'.slice(0, -1) + folderPath;
+                }
+            }
+        });
+
+        // Show actions on hover for touch devices
+        item.addEventListener('mouseenter', function() {
+            this.querySelector('.file-actions').style.display = 'flex';
+        });
+
+        item.addEventListener('mouseleave', function() {
+            this.querySelector('.file-actions').style.display = 'none';
+        });
+    });
+
+    // Click anywhere on grid to deselect
+    fileGrid.addEventListener('click', function(e) {
+        if (e.target === this) {
+            selectedItems.forEach(el => el.classList.remove('selected'));
+            selectedItems.clear();
         }
     });
-    
+
     // Calculate storage used
     function calculateStorage() {
         let totalSize = 0;
@@ -303,49 +551,33 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endfor %}
         
         const storageElement = document.getElementById('storageUsed');
-        if (totalSize < 1048576) {
-            storageElement.textContent = (totalSize / 1024).toFixed(1) + ' KB';
+        if (totalSize === 0) {
+            storageElement.textContent = '0 B';
+        } else if (totalSize < 1024) {
+            storageElement.textContent = totalSize + ' B';
+        } else if (totalSize < 1048576) {
+            storageElement.textContent = (totalSize / 1024).toFixed(2) + ' KB';
         } else if (totalSize < 1073741824) {
-            storageElement.textContent = (totalSize / 1048576).toFixed(1) + ' MB';
+            storageElement.textContent = (totalSize / 1048576).toFixed(2) + ' MB';
         } else {
-            storageElement.textContent = (totalSize / 1073741824).toFixed(1) + ' GB';
+            storageElement.textContent = (totalSize / 1073741824).toFixed(2) + ' GB';
         }
     }
     
     calculateStorage();
-    
-    // Add animation to table rows
-    const rows = document.querySelectorAll('tbody tr');
-    rows.forEach((row, index) => {
-        row.style.animationDelay = `${index * 0.05}s`;
-    });
-    
-    // Prevent event propagation on action buttons
-    const actionButtons = document.querySelectorAll('.action-buttons');
-    actionButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
-    });
-    
-    // Make folder rows clickable (for opening folder)
-    const folderRows = document.querySelectorAll('.folder-row');
-    folderRows.forEach(row => {
-        // Don't make the entire row clickable, only the open button
-        const openButton = row.querySelector('.btn-outline-info');
-        if (openButton) {
-            row.style.cursor = 'default';
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Delete') {
+            selectedItems.forEach(item => {
+                // Find the delete button
+                const deleteBtn = item.querySelector('a[onclick*="Delete"]');
+                if (deleteBtn) {
+                    deleteBtn.click();
+                }
+            });
         }
     });
-    
-    // Auto-refresh every 30 seconds
-    setInterval(() => {
-        fetch(window.location.href)
-            .then(response => response.text())
-            .then(html => {
-                console.log('Auto-refreshed at ' + new Date().toLocaleTimeString());
-            });
-    }, 30000);
 });
 </script>
 {% endblock %}
