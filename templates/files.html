@@ -54,14 +54,16 @@
             <i class="fas fa-folder-plus me-1"></i>New Folder
         </button>
     </form>
-    <label class="btn btn-outline-success">
-        <i class="fas fa-arrow-up me-1"></i>Upload
-        <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm">
-            <input type="hidden" name="current_path" value="{{ current_path }}">
-            <input type="file" form="uploadForm" id="fileUpload" multiple name="file" style="display: none;">
-        </form>
-    </label>
+    <input type="file" id="fileUpload" multiple name="file" style="display: none;" accept="*/*">
+    <button type="button" id="uploadButton" class="btn btn-outline-success">
+        <i class="fas fa-arrow-up me-1"></i>Upload File
+    </button>
 </div>
+
+<!-- Hidden form for upload -->
+<form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data" id="uploadForm" style="display: none;">
+    <input type="hidden" name="current_path" value="{{ current_path }}">
+</form>
 
 <!-- Main File Explorer View -->
 <div class="explorer-container bg-dark-blue border border-secondary rounded" style="min-height: 500px;">
@@ -427,6 +429,18 @@
     color: #93c5fd;
 }
 
+.btn-outline-success:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Drag and drop styles */
+.explorer-container.drag-over {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 100%) !important;
+    border-color: #60a5fa !important;
+    border-width: 2px !important;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .file-grid {
@@ -445,42 +459,167 @@
 document.addEventListener('DOMContentLoaded', function() {
     const fileGrid = document.getElementById('fileGrid');
     const fileUploadInput = document.getElementById('fileUpload');
+    const uploadButton = document.getElementById('uploadButton');
+    const uploadForm = document.getElementById('uploadForm');
     let selectedItems = new Set();
+    let isUploading = false;
 
-    // File upload handling
-    const uploadButton = document.querySelector('.btn-outline-success');
-    if (uploadButton) {
-        uploadButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            fileUploadInput.click();
-        });
-    }
+    // Upload button click handler
+    uploadButton.addEventListener('click', function(e) {
+        e.preventDefault();
+        fileUploadInput.click();
+    });
 
-    // Handle file selection and upload
+    // Handle file selection from upload button
     fileUploadInput.addEventListener('change', function() {
         if (this.files.length > 0) {
-            const formData = new FormData(document.getElementById('uploadForm'));
-            
-            // Add files to form data
-            for (let file of this.files) {
-                // Upload each file individually
-                const form = new FormData();
-                form.append('file', file);
-                form.append('current_path', document.querySelector('input[name="current_path"]').value);
-                
-                fetch('{{ url_for("upload_file") }}', {
-                    method: 'POST',
-                    body: form
-                }).then(() => {
-                    location.reload();
-                }).catch(err => {
-                    console.error('Upload error:', err);
-                    alert('Upload failed: ' + err);
-                });
-            }
+            uploadFiles(this.files);
         }
-        this.value = '';
     });
+
+    // Drag and drop functionality
+    fileGrid.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileGrid.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        fileGrid.style.borderColor = '#60a5fa';
+        fileGrid.style.borderWidth = '2px';
+    });
+
+    fileGrid.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileGrid.style.backgroundColor = '';
+        fileGrid.style.borderColor = '';
+        fileGrid.style.borderWidth = '';
+    });
+
+    fileGrid.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileGrid.style.backgroundColor = '';
+        fileGrid.style.borderColor = '';
+        fileGrid.style.borderWidth = '';
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            uploadFiles(files);
+        }
+    });
+
+    // Upload files function
+    function uploadFiles(files) {
+        if (isUploading) {
+            alert('Please wait for the current upload to complete.');
+            return;
+        }
+
+        if (files.length === 0) {
+            alert('No files selected!');
+            return;
+        }
+
+        isUploading = true;
+        const totalFiles = files.length;
+        let uploadedFiles = 0;
+        let failedFiles = 0;
+        const failedFilenames = [];
+
+        // Show loading indicator
+        const originalButtonText = uploadButton.innerHTML;
+        uploadButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+        uploadButton.disabled = true;
+
+        // Get current path from hidden input
+        const currentPathInput = document.querySelector('input[name="current_path"]');
+        const currentPath = currentPathInput ? currentPathInput.value : '';
+
+        console.log('Starting upload of', files.length, 'file(s) to path:', currentPath);
+
+        // Upload each file
+        const uploadPromises = Array.from(files).map((file) => {
+            console.log('Preparing upload for:', file.name, '(', file.type, file.size, 'bytes)');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('current_path', currentPath);
+
+            return fetch('{{ url_for("upload_file") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                console.log(`Response for ${file.name}:`, response.status, response.statusText);
+                
+                // Try to parse as JSON
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Response is not JSON, probably an error or redirect
+                    return response.text().then(text => {
+                        console.error('Non-JSON response for', file.name, ':', text.substring(0, 200));
+                        return {
+                            success: false,
+                            message: 'Server returned non-JSON response (Status: ' + response.status + ')',
+                            status: response.status
+                        };
+                    });
+                }
+            })
+            .then(data => {
+                console.log('Parsed response for', file.name, ':', data);
+                
+                if (data.success) {
+                    uploadedFiles++;
+                    console.log(`✓ Uploaded: ${file.name}`);
+                } else {
+                    failedFiles++;
+                    failedFilenames.push(file.name);
+                    console.error(`✗ Failed to upload: ${file.name}`, data.message);
+                }
+            })
+            .catch(error => {
+                failedFiles++;
+                failedFilenames.push(file.name);
+                console.error(`✗ Error uploading ${file.name}:`, error);
+            });
+        });
+
+        // Wait for all uploads to complete
+        Promise.all(uploadPromises).then(() => {
+            console.log('Upload complete:', uploadedFiles, 'succeeded,', failedFiles, 'failed');
+            
+            isUploading = false;
+            uploadButton.innerHTML = originalButtonText;
+            uploadButton.disabled = false;
+            fileUploadInput.value = ''; // Clear the input
+
+            // Show result message
+            if (uploadedFiles > 0 || failedFiles > 0) {
+                if (failedFiles === 0) {
+                    alert(`✓ Successfully uploaded ${uploadedFiles} file(s)!`);
+                    location.reload();
+                } else if (uploadedFiles > 0) {
+                    alert(`Uploaded ${uploadedFiles} file(s), ${failedFiles} failed.\nFailed: ${failedFilenames.join(', ')}`);
+                    location.reload();
+                } else {
+                    alert(`✗ Failed to upload files:\n${failedFilenames.join(', ')}\n\nCheck the browser console for details.`);
+                }
+            } else {
+                alert('No files were uploaded.');
+            }
+        }).catch(error => {
+            console.error('Upload promise error:', error);
+            isUploading = false;
+            uploadButton.innerHTML = originalButtonText;
+            uploadButton.disabled = false;
+            alert('An error occurred during upload. Check browser console for details.');
+        });
+    }
 
     // File explorer double-click and selection
     const fileItems = document.querySelectorAll('.file-item');

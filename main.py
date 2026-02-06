@@ -45,14 +45,14 @@ class ServerTUI:
         self.clear_screen()
         
         banner = r"""
-        ███████╗████████╗██████╗
+        ███████╗████████╗██████╗ 
         ██╔════╝╚══██╔══╝██╔══██╗
         █████╗      ██║   ██████╔╝
-        ██╔══╝      ██║   ██╔═══╝
-        ██║         ██║   ██║
-        ╚═╝         ╚═╝   ╚═╝
+        ██╔══╝      ██║   ██╔═══╝ 
+        ██║         ██║   ██║     
+        ╚═╝         ╚═╝   ╚═╝     
         """
-        
+
         self.console.print(f"[bold blue]{banner}[/bold blue]")
         self.console.print("[bold cyan]Secure FTP-like Server with Ngrok Tunneling[/bold cyan]")
         self.console.print("[dim]Press Ctrl+C to exit[/dim]\n")

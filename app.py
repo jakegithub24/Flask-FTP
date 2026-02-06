@@ -12,7 +12,24 @@ app.secret_key = os.urandom(24)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['STORAGE_FOLDER'] = 'storage'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
-app.config['ALLOWED_EXTENSIONS'] = {'txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'}
+# Allow most common file types - this is an FTP server after all
+app.config['ALLOWED_EXTENSIONS'] = {
+    # Documents
+    'txt', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
+    # Images
+    'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff',
+    # Archives
+    'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
+    # Code
+    'py', 'js', 'html', 'css', 'java', 'cpp', 'c', 'h', 'java', 'rb', 'go', 'rs', 'php',
+    'sql', 'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg',
+    # Media
+    'mp3', 'mp4', 'avi', 'mkv', 'mov', 'flv', 'wmv', 'wav', 'aac', 'flac', 'ogg',
+    # Others
+    'iso', 'bin', 'exe', 'msi', 'dmg', 'apk', 'deb', 'rpm', 'sh', 'bat', 'cmd',
+    'log', 'csv', 'sql', 'db', 'sqlite', 'md', 'tex', 'ps', 'eps', 'psd', 'ai'
+}
+
 
 # Create storage folder if it doesn't exist
 os.makedirs(app.config['STORAGE_FOLDER'], exist_ok=True)
@@ -31,7 +48,8 @@ def login_required(f):
     return decorated_function
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+    # For an FTP server, allow all files
+    return len(filename) > 0 and '.' in filename
 
 def get_safe_path(folder_path):
     """Get safe path that doesn't allow directory traversal"""
@@ -201,29 +219,49 @@ def download_folder(folder_path):
 @login_required
 def upload_file():
     """Upload file to current folder"""
+    from flask import jsonify
+    
     current_path = request.form.get('current_path', '')
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     
     if 'file' not in request.files:
-        flash('No file selected!', 'error')
+        msg = 'No file selected!'
+        if is_ajax:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'error')
         return redirect(url_for('file_list', folder_path=current_path))
     
     file = request.files['file']
     if file.filename == '':
-        flash('No file selected!', 'error')
+        msg = 'No file selected!'
+        if is_ajax:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'error')
         return redirect(url_for('file_list', folder_path=current_path))
     
     if file and allowed_file(file.filename):
         try:
             current_dir = get_safe_path(current_path)
             filename = secure_filename(file.filename)
-            file.save(os.path.join(current_dir, filename))
-            flash(f'File "{filename}" uploaded successfully!', 'success')
+            filepath = os.path.join(current_dir, filename)
+            file.save(filepath)
+            msg = f'File "{filename}" uploaded successfully!'
+            if is_ajax:
+                return jsonify({'success': True, 'message': msg, 'filename': filename}), 200
+            flash(msg, 'success')
         except Exception as e:
-            flash(f'Error uploading file: {str(e)}', 'error')
+            msg = f'Error uploading file: {str(e)}'
+            if is_ajax:
+                return jsonify({'success': False, 'message': msg}), 500
+            flash(msg, 'error')
     else:
-        flash('File type not allowed!', 'error')
+        msg = 'File type not allowed!'
+        if is_ajax:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'error')
     
     return redirect(url_for('file_list', folder_path=current_path))
+
 
 @app.route('/create_folder', methods=['POST'])
 @login_required
