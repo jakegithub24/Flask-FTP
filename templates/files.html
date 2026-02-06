@@ -520,7 +520,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // If it's a folder, navigate to it
                 if (this.classList.contains('folder-item')) {
                     const folderPath = this.getAttribute('data-folder');
-                    window.location.href = '{{ url_for("file_list", folder_path="") }}'.slice(0, -1) + folderPath;
+                    const baseUrl = '{{ url_for("file_list") }}'; // Gets /files
+                    window.location.href = baseUrl + '/' + folderPath;
                 }
             }
         });
