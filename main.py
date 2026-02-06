@@ -32,6 +32,7 @@ class ServerTUI:
     def __init__(self):
         self.console = Console()
         self.session_password = None
+        self.access_privilege = None
         self.ngrok_url = None
         self.server_running = False
         self.layout = Layout()
@@ -77,10 +78,38 @@ class ServerTUI:
             else:
                 self.console.print("[red]✗ Passwords don't match. Please try again.[/red]")
     
+    def get_access_privilege(self):
+        """Get access privilege configuration from user input"""
+        self.console.print("\n[bold blue]⎯" * 50)
+        self.console.print("[bold blue]🔐 ACCESS PRIVILEGE SETUP[/bold blue]")
+        self.console.print("[bold blue]⎯" * 50)
+        self.console.print("[cyan]What type of FTP server do you want to setup?[/cyan]\n")
+        
+        options = {
+            '1': {'name': 'Upload Only', 'value': 'upload_only'},
+            '2': {'name': 'Download Only', 'value': 'download_only'},
+            '3': {'name': 'Upload and Download', 'value': 'upload_download'}
+        }
+        
+        for key, option in options.items():
+            self.console.print(f"[yellow]{key}.[/yellow] {option['name']}")
+        
+        while True:
+            choice = self.console.input("\n[bold cyan]Select option (1-3): [/bold cyan]").strip()
+            
+            if choice in options:
+                self.access_privilege = options[choice]['value']
+                privilege_name = options[choice]['name']
+                self.console.print(f"[green]✓ Access privilege set to: {privilege_name}[/green]")
+                return self.access_privilege
+            else:
+                self.console.print("[red]✗ Invalid option. Please select 1, 2, or 3.[/red]")
+    
     def start_flask_server(self):
         """Start the Flask server in a separate thread"""
-        # Set the session password as environment variable BEFORE importing app
+        # Set the session password and access privilege as environment variables BEFORE importing app
         os.environ['SESSION_PASSWORD'] = self.session_password
+        os.environ['ACCESS_PRIVILEGE'] = self.access_privilege
         
         from app import app
         
@@ -219,6 +248,7 @@ class ServerTUI:
         try:
             self.print_banner()
             self.get_session_password()
+            self.get_access_privilege()
             
             # Start Flask server
             self.console.print("\n[bold blue]🚀 STARTING SERVER[/bold blue]")
@@ -246,6 +276,16 @@ class ServerTUI:
                     self.console.print(f"[bold green]{self.ngrok_url}[/bold green]")
                     self.console.print("\n[bold cyan]Session Password:[/bold cyan]", style="bold white")
                     self.console.print(f"[bold yellow]{self.session_password}[/bold yellow]")
+                    
+                    # Convert privilege setting to readable format
+                    privilege_map = {
+                        'upload_only': 'Upload Only',
+                        'download_only': 'Download Only',
+                        'upload_download': 'Upload & Download'
+                    }
+                    privilege_name = privilege_map.get(self.access_privilege, self.access_privilege)
+                    self.console.print("\n[bold cyan]Access Privilege:[/bold cyan]", style="bold white")
+                    self.console.print(f"[bold cyan]{privilege_name}[/bold cyan]")
                     
                     self.console.print("\n[dim]Press Enter to continue to dashboard...[/dim]")
                     input()

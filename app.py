@@ -34,6 +34,25 @@ app.config['ALLOWED_EXTENSIONS'] = {
 # Create storage folder if it doesn't exist
 os.makedirs(app.config['STORAGE_FOLDER'], exist_ok=True)
 
+def get_access_privilege():
+    """Get the access privilege setting from environment"""
+    return os.environ.get('ACCESS_PRIVILEGE', 'upload_download')
+
+def can_upload():
+    """Check if upload is allowed"""
+    privilege = get_access_privilege()
+    return privilege in ['upload_only', 'upload_download']
+
+def can_download():
+    """Check if download is allowed"""
+    privilege = get_access_privilege()
+    return privilege in ['download_only', 'upload_download']
+
+def can_delete():
+    """Check if delete is allowed (only in full access mode)"""
+    privilege = get_access_privilege()
+    return privilege == 'upload_download'
+
 def get_session_password_hash():
     """Dynamically get the session password hash from environment"""
     password = os.environ.get('SESSION_PASSWORD', 'default')
@@ -158,12 +177,18 @@ def file_list(folder_path=''):
     breadcrumb = get_breadcrumb(folder_path)
     
     return render_template('files.html', files=files, folders=folders, 
-                         current_path=folder_path, breadcrumb=breadcrumb)
+                         current_path=folder_path, breadcrumb=breadcrumb,
+                         can_upload=can_upload(), can_download=can_download(),
+                         can_delete=can_delete())
 
 @app.route('/download/<path:file_path>')
 @login_required
 def download_file(file_path):
     """Download a file from any subfolder"""
+    if not can_download():
+        flash('Download is not allowed on this server!', 'error')
+        return redirect(url_for('file_list'))
+    
     try:
         # Clean the path - split and sanitize each component
         path_parts = file_path.split('/')
@@ -188,6 +213,10 @@ def download_file(file_path):
 @login_required
 def download_folder(folder_path):
     """Download a folder as ZIP"""
+    if not can_download():
+        flash('Download is not allowed on this server!', 'error')
+        return redirect(url_for('file_list'))
+    
     try:
         # Get safe folder path
         full_path = get_safe_path(folder_path)
@@ -220,6 +249,13 @@ def download_folder(folder_path):
 def upload_file():
     """Upload file to current folder"""
     from flask import jsonify
+    
+    if not can_upload():
+        msg = 'Upload is not allowed on this server!'
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 403
+        flash(msg, 'error')
+        return redirect(url_for('file_list', folder_path=request.form.get('current_path', '')))
     
     current_path = request.form.get('current_path', '')
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -288,6 +324,10 @@ def create_folder():
 @login_required
 def delete_file(file_path):
     """Delete file or folder"""
+    if not can_delete():
+        flash('Delete operations are not allowed on this server!', 'error')
+        return redirect(url_for('file_list'))
+    
     try:
         # Clean the path - split and sanitize each component
         path_parts = file_path.split('/')

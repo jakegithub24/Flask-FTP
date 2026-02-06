@@ -43,6 +43,7 @@
 
 <!-- Upload & Create Folder Section -->
 <div class="mb-3 d-flex gap-2">
+    {% if can_upload %}
     <form method="POST" action="{{ url_for('create_folder') }}" class="flex-grow-1 d-flex gap-2">
         <input type="hidden" name="current_path" value="{{ current_path }}">
         <input type="text" 
@@ -58,6 +59,11 @@
     <button type="button" id="uploadButton" class="btn btn-outline-success">
         <i class="fas fa-arrow-up me-1"></i>Upload File
     </button>
+    {% else %}
+    <div class="alert alert-warning flex-grow-1" role="alert">
+        <i class="fas fa-lock me-2"></i>Upload is disabled on this server
+    </div>
+    {% endif %}
 </div>
 
 <!-- Hidden form for upload -->
@@ -86,15 +92,19 @@
                         <span class="file-name" title="{{ folder.name }}">{{ folder.name }}</span>
                     </div>
                     <div class="file-actions" style="display: none;">
+                        {% if can_download %}
                         <a href="{{ url_for('download_folder', folder_path=folder.path) }}" 
                            class="action-link" title="Download as ZIP">
                             <i class="fas fa-download"></i>
                         </a>
+                        {% endif %}
+                        {% if can_delete %}
                         <a href="{{ url_for('delete_file', file_path=folder.path) }}" 
                            class="action-link" title="Delete"
                            onclick="return confirm('Delete this folder and all contents?')">
                             <i class="fas fa-trash"></i>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -135,15 +145,19 @@
                         </span>
                     </div>
                     <div class="file-actions" style="display: none;">
+                        {% if can_download %}
                         <a href="{{ url_for('download_file', file_path=file.path) }}" 
                            class="action-link" title="Download">
                             <i class="fas fa-download"></i>
                         </a>
+                        {% endif %}
+                        {% if can_delete %}
                         <a href="{{ url_for('delete_file', file_path=file.path) }}" 
                            class="action-link" title="Delete"
                            onclick="return confirm('Delete this file?')">
                             <i class="fas fa-trash"></i>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
