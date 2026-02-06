@@ -133,9 +133,9 @@ AGPL v3.0
 4. **Session issues**: Clear browser cookies or use incognito mode
 
 ## Contributing
-Feel free to submit issues and enhancement requests!
+Feel free to submit issues and enhancement requests!<br/>
 Also feel free to fork the repo and tinker with it. Always open for PRs (new features and bug fixes).
 
 ---
 
-Developed with ❤️ by (jakegithub24)[https://github.com/jakegithub24]
+Developed with ❤️ by [jakegithub24](https://github.com/jakegithub24)
