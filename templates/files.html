@@ -12,17 +12,17 @@
             </a>
             <span class="breadcrumb-separator me-2">&gt;</span>
             {% for item in breadcrumb %}
-                {% if item.path %}
+                {% if item.path and not loop.last %}
                     <a href="{{ url_for('file_list', folder_path=item.path) }}" class="breadcrumb-link">
                         {{ item.name }}
                     </a>
                     <span class="breadcrumb-separator mx-2">&gt;</span>
                 {% endif %}
             {% endfor %}
-            {% if current_path %}
-                <span class="breadcrumb-current">{{ breadcrumb[-1].name if breadcrumb else 'Storage' }}</span>
+            {% if current_path and breadcrumb|length > 1 %}
+                <span class="breadcrumb-current">{{ breadcrumb[-1].name }}</span>
             {% else %}
-                <span class="breadcrumb-current">Storage</span>
+                <span class="breadcrumb-current"></span>
             {% endif %}
         </nav>
     </div>
