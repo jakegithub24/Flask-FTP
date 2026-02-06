@@ -1,0 +1,6 @@
+Flask==3.0.0
+Flask-Session==0.5.0
+pyngrok==7.0.0
+cryptography==41.0.7
+colorama==0.4.6
+rich==13.7.0

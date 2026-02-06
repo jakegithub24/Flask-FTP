@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6 col-lg-4">
+        <div class="card bg-dark-blue border-primary animate__animated animate__fadeIn">
+            <div class="card-header bg-transparent border-primary">
+                <h4 class="text-center mb-0">
+                    <i class="fas fa-lock me-2"></i>Session Login
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="fas fa-key me-1"></i>Session Password
+                        </label>
+                        <div class="input-group">
+                            <input type="password" 
+                                   class="form-control bg-dark border-primary" 
+                                   id="password" 
+                                   name="password" 
+                                   required
+                                   placeholder="Enter session password">
+                            <button class="btn btn-outline-primary" type="button" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text text-muted">
+                            Enter the password provided by the server administrator
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt me-2"></i>Access Files
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-4">
+                    <div class="spinner-border text-primary d-none" id="loadingSpinner" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-transparent border-primary text-center">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Secure connection established via ngrok tunnel
+                </small>
+            </div>
+        </div>
+        
+        <!-- Security Info -->
+        <div class="card bg-dark-blue border-primary mt-4 animate__animated animate__fadeInUp">
+            <div class="card-body">
+                <h6><i class="fas fa-shield-alt me-2 text-info"></i>Security Information</h6>
+                <ul class="list-unstyled text-muted small">
+                    <li><i class="fas fa-check-circle text-success me-2"></i>End-to-end encrypted connection</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i>Session-based authentication</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i>Secure file transfers</li>
+                    <li><i class="fas fa-check-circle text-success me-2"></i>Auto-expiring sessions</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('loginForm');
+    const toggleBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const spinner = document.getElementById('loadingSpinner');
+    
+    // Toggle password visibility
+    toggleBtn.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
+        this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+    });
+    
+    // Form submission
+    form.addEventListener('submit', function() {
+        spinner.classList.remove('d-none');
+    });
+    
+    // Add floating animation to card
+    const card = document.querySelector('.card');
+    setInterval(() => {
+        card.style.transform = `translateY(${Math.sin(Date.now() / 1000) * 2}px)`;
+    }, 50);
+});
+</script>
+{% endblock %}
